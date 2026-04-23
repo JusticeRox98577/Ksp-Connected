@@ -42,12 +42,13 @@ namespace KspConnected.Client.Core
 
         private void WireEvents()
         {
-            Connection.OnHelloAck += OnHelloAck;
-            Connection.OnPlayerList += OnPlayerList;
-            Connection.OnVesselUpdate += OnVesselUpdate;
-            Connection.OnChat += OnChat;
+            Connection.OnHelloAck      += OnHelloAck;
+            Connection.OnPlayerList    += OnPlayerList;
+            Connection.OnVesselUpdate  += OnVesselUpdate;
+            Connection.OnVesselConfig  += OnVesselConfig;
+            Connection.OnChat          += OnChat;
             Connection.OnTimeSyncReply += OnTimeSyncReply;
-            Connection.OnDisconnected += OnDisconnected;
+            Connection.OnDisconnected  += OnDisconnected;
         }
 
         private void Update()
@@ -77,13 +78,24 @@ namespace KspConnected.Client.Core
         }
 
         private void OnPlayerList(PlayerListMessage msg)  => Players.Update(msg);
-        private void OnVesselUpdate(VesselUpdateMessage msg) => VesselStore.Update(msg.State);
+        private void OnVesselConfig(VesselConfigMessage msg)
+        {
+            // Delegate spawning to GhostVesselManager (only exists in Flight scene)
+            Sync.GhostVesselManager.Instance?.OnVesselConfig(msg);
+        }
+
+        private void OnVesselUpdate(VesselUpdateMessage msg)
+        {
+            VesselStore.Update(msg.State);
+            Sync.GhostVesselManager.Instance?.OnVesselUpdate(msg.State);
+        }
         private void OnChat(ChatMessage msg)              => Chat.Receive(msg);
         private void OnTimeSyncReply(TimeSyncReplyMessage msg) => TimeSync.HandleReply(msg);
         private void OnDisconnected(string reason)
         {
             VesselStore.Clear();
             Players.Clear();
+            Sync.GhostVesselManager.Instance?.RemoveAll();
             Logger.Log("Disconnected: " + reason);
         }
 

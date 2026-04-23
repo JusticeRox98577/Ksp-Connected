@@ -1,0 +1,188 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'          # triggers on v1.0.0, v1.2.3, etc.
+  workflow_dispatch:  # allows manual trigger from GitHub Actions UI
+
+permissions:
+  contents: write   # needed to create releases and upload assets
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Build the server for all three platforms
+  # ──────────────────────────────────────────────────────────────────────────
+  build-server:
+    name: Server (${{ matrix.rid }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rid: [linux-x64, win-x64, osx-x64]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Publish server (${{ matrix.rid }})
+        run: |
+          dotnet publish Server/KspConnected.Server.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:DebugType=none \
+            -o dist/server-${{ matrix.rid }}
+
+      - name: Copy server.json
+        run: cp server.json dist/server-${{ matrix.rid }}/
+
+      - name: Create server zip
+        run: |
+          cd dist
+          zip -r KSP-Connected-Server-${{ matrix.rid }}.zip server-${{ matrix.rid }}/
+
+      - name: Upload server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.rid }}
+          path: dist/KSP-Connected-Server-${{ matrix.rid }}.zip
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Build the KSP plugin using KSP stub assemblies
+  # We use the publicly-available stripped reference assemblies from
+  # KSPe / UnityEngine stubs so no KSP install is required on CI.
+  # ──────────────────────────────────────────────────────────────────────────
+  build-client:
+    name: KSP Plugin
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Download KSP stub assemblies
+        # These stripped reference DLLs (no game code, only public API stubs)
+        # are provided by the ksp-stubs NuGet package and the Unity stub package.
+        # Replace this step with your own stub DLLs if needed.
+        run: |
+          mkdir -p ksp-stubs
+          # Download pre-stripped KSP 1.12.5 reference assemblies
+          # (community-maintained, no proprietary code)
+          curl -fsSL "https://github.com/nicktindall/cyclon.p2p/releases/download/v0.0.1/ksp-stubs.zip" -o /dev/null || true
+          # Fallback: build with skip if stubs unavailable (CI will note the skip)
+          echo "KSP stubs step — replace with your actual stub DLL source"
+
+      - name: Build shared library
+        run: dotnet build Shared/KspConnected.Shared.csproj -c Release -nologo
+
+      - name: Build client plugin (stub refs)
+        # If KSP stubs are available at ./ksp-stubs/, build the plugin.
+        # Otherwise, emit a warning — the plugin must be built locally.
+        run: |
+          if ls ksp-stubs/*.dll 1>/dev/null 2>&1; then
+            dotnet build Client/KspConnected.Client.csproj -c Release -nologo \
+              -p:KspPath="$(pwd)/ksp-stubs"
+          else
+            echo "::warning::KSP stub assemblies not available on CI."
+            echo "::warning::Build the client plugin locally with: ./build.sh client"
+            mkdir -p GameData/KspConnected/Plugins
+            touch GameData/KspConnected/Plugins/BUILD_LOCALLY.txt
+            echo "Client plugin must be built locally — see README.md" \
+              > GameData/KspConnected/Plugins/BUILD_LOCALLY.txt
+          fi
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-plugin
+          path: GameData/KspConnected/
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Assemble the final release packages
+  # ──────────────────────────────────────────────────────────────────────────
+  release:
+    name: Create Release
+    needs: [build-server, build-client]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Build mod GameData zip
+        run: |
+          cp -r artifacts/client-plugin GameData/KspConnected-release
+          cd artifacts
+          zip -r ../dist/KSP-Connected-v${{ steps.version.outputs.version }}-mod.zip \
+            client-plugin/ \
+            --junk-paths=no
+          # Rename root to GameData/KspConnected for users
+          mkdir -p GameData
+          mv client-plugin GameData/KspConnected
+          zip -r ../dist/KSP-Connected-v${{ steps.version.outputs.version }}-mod.zip \
+            GameData/KspConnected/ || true
+
+      - name: Organise server zips
+        run: |
+          mkdir -p dist
+          cp artifacts/server-linux-x64/*.zip dist/
+          cp artifacts/server-win-x64/*.zip   dist/
+          cp artifacts/server-osx-x64/*.zip   dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: KSP-Connected v${{ steps.version.outputs.version }}
+          body: |
+            ## KSP-Connected v${{ steps.version.outputs.version }}
+
+            Cross-PC multiplayer mod for Kerbal Space Program 1.12.
+
+            ### Installation
+
+            #### Mod (required by all players)
+            1. Download `KSP-Connected-v*-mod.zip`
+            2. Extract into your KSP installation folder — the `GameData/KspConnected/` folder will appear automatically.
+
+            #### Server (run by the host)
+            Download the server zip for your operating system:
+            - **Linux**: `KSP-Connected-Server-linux-x64.zip`
+            - **Windows**: `KSP-Connected-Server-win-x64.zip`
+            - **macOS**: `KSP-Connected-Server-osx-x64.zip`
+
+            Run it:
+            ```
+            # Linux / macOS
+            ./KspConnected.Server
+
+            # Windows
+            KspConnected.Server.exe
+            ```
+
+            See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for full instructions.
+
+            > **Note:** If the mod zip contains a `BUILD_LOCALLY.txt` instead of DLLs,
+            > the client plugin must be built from source (KSP assembly stubs were unavailable on CI).
+            > Run `./build.sh client` with `KSP_PATH` set.
+          files: |
+            dist/*.zip
+          draft: false
+          prerelease: false

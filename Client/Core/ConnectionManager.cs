@@ -16,12 +16,13 @@ namespace KspConnected.Client.Core
         public int LocalPlayerId { get; private set; } = -1;
 
         // Inbound message events — fired on Unity main thread via ThreadDispatcher
-        public event Action<HelloAckMessage>    OnHelloAck;
-        public event Action<PlayerListMessage>  OnPlayerList;
-        public event Action<VesselUpdateMessage> OnVesselUpdate;
-        public event Action<ChatMessage>        OnChat;
+        public event Action<HelloAckMessage>      OnHelloAck;
+        public event Action<PlayerListMessage>    OnPlayerList;
+        public event Action<VesselUpdateMessage>  OnVesselUpdate;
+        public event Action<VesselConfigMessage>  OnVesselConfig;
+        public event Action<ChatMessage>          OnChat;
         public event Action<TimeSyncReplyMessage> OnTimeSyncReply;
-        public event Action<string>             OnDisconnected;  // reason
+        public event Action<string>               OnDisconnected;  // reason
 
         private TcpClient   _tcp;
         private NetworkStream _stream;
@@ -78,6 +79,9 @@ namespace KspConnected.Client.Core
 
         public void SendVesselUpdate(VesselUpdateMessage msg) =>
             SendPayload(MessageType.VesselUpdate, msg.ToPayload());
+
+        public void SendVesselConfig(VesselConfigMessage msg) =>
+            SendPayload(MessageType.VesselConfig, msg.ToPayload());
 
         public void SendChat(ChatMessage msg) =>
             SendPayload(MessageType.Chat, msg.ToPayload());
@@ -138,6 +142,11 @@ namespace KspConnected.Client.Core
                 case MessageType.VesselUpdate:
                     var vu = VesselUpdateMessage.FromPayload(payload);
                     ThreadDispatcher.Instance.Enqueue(() => OnVesselUpdate?.Invoke(vu));
+                    break;
+
+                case MessageType.VesselConfig:
+                    var vc = VesselConfigMessage.FromPayload(payload);
+                    ThreadDispatcher.Instance.Enqueue(() => OnVesselConfig?.Invoke(vc));
                     break;
 
                 case MessageType.Chat:

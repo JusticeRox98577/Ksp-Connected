@@ -9,8 +9,8 @@ namespace KspConnected.Client.Sync
 {
     /// <summary>
     /// Runs in the Flight scene. Samples the active vessel and sends
-    /// VesselUpdateMessage to the server when significant changes occur
-    /// or the periodic heartbeat timer fires.
+    /// VesselUpdateMessage (position/state) every tick and VesselConfigMessage
+    /// (full ConfigNode for ghost spawning) whenever the vessel identity changes.
     /// </summary>
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public class VesselSyncSender : MonoBehaviour
@@ -21,6 +21,7 @@ namespace KspConnected.Client.Sync
 
         private VesselState _lastSent;
         private float       _heartbeatTimer;
+        private Guid        _lastSentVesselId;   // track vessel identity for config resends
 
         private void Update()
         {
@@ -33,6 +34,13 @@ namespace KspConnected.Client.Sync
             Vessel active = FlightGlobals.ActiveVessel;
             if (active == null) return;
 
+            // Send vessel config whenever we switch to a different vessel
+            if (active.id != _lastSentVesselId)
+            {
+                SendVesselConfig(active, mod);
+                _lastSentVesselId = active.id;
+            }
+
             VesselState state = SnapshotVessel(active, mod.Connection.LocalPlayerId, mod.PlayerName);
             if (state == null) return;
 
@@ -41,6 +49,32 @@ namespace KspConnected.Client.Sync
                 mod.Connection.SendVesselUpdate(new VesselUpdateMessage { State = state });
                 _lastSent = state;
                 if (forceHeartbeat) _heartbeatTimer = 0f;
+            }
+        }
+
+        private void SendVesselConfig(Vessel v, KspConnectedMod mod)
+        {
+            try
+            {
+                // Back up the vessel to a ConfigNode and send it compressed
+                ProtoVessel proto = v.BackupVessel();
+                var node = new ConfigNode("VESSEL");
+                proto.Save(node);
+                string configText = node.ToString();
+
+                byte[] compressed = VesselConfigMessage.Compress(configText);
+                var msg = new VesselConfigMessage
+                {
+                    PlayerId   = mod.Connection.LocalPlayerId,
+                    VesselId   = v.id.ToString(),
+                    ConfigData = compressed,
+                };
+                mod.Connection.SendVesselConfig(msg);
+                Logger.Log($"VesselConfig sent ({compressed.Length} bytes compressed).");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("SendVesselConfig: " + ex.Message);
             }
         }
 

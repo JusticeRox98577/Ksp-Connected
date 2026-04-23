@@ -12,5 +12,6 @@ namespace KspConnected.Shared.Protocol
         Disconnect      = 0x08,
         Ping            = 0x09,
         Pong            = 0x0A,
+        VesselConfig    = 0x0B,  // full vessel ConfigNode — sent once per vessel
     }
 }

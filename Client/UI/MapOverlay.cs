@@ -6,8 +6,9 @@ using UnityEngine;
 namespace KspConnected.Client.UI
 {
     /// <summary>
-    /// Draws remote player vessel markers in KSP's map view by projecting
-    /// world-space positions through the planetarium camera.
+    /// Draws player name labels on the KSP map view next to each ghost vessel.
+    /// For players whose ghost vessel hasn't spawned yet, also draws a fallback
+    /// position marker projected from their last known surface coordinates.
     /// </summary>
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public class MapOverlay : MonoBehaviour

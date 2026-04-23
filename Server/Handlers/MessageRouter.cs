@@ -17,6 +17,7 @@ namespace KspConnected.Server.Handlers
                     case MessageType.VesselUpdate: VesselUpdateHandler.Handle(session, server, payload); break;
                     case MessageType.Chat:         ChatHandler.Handle(session, server, payload);         break;
                     case MessageType.TimeSync:     TimeSyncHandler.Handle(session, server, payload);     break;
+                    case MessageType.VesselConfig:  VesselConfigHandler.Handle(session, server, payload);  break;
                     case MessageType.Disconnect:   DisconnectHandler.Handle(session, server, payload);   break;
                     case MessageType.Ping:
                         session.Send(MessageType.Pong, Array.Empty<byte>());
