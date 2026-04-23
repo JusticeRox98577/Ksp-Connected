@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      Target .NET Framework 4.8 — pre-installed on every Windows 10/11 machine.
+      Output is a lightweight ~200 KB exe with zero additional dependencies.
+      Build: dotnet build Installer/KspConnectedInstaller.csproj -c Release
+      Output: Installer/bin/Release/net48/KspConnected-Installer.exe
+    -->
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>KspConnected-Installer</AssemblyName>
+    <RootNamespace>KspConnectedInstaller</RootNamespace>
+    <Nullable>disable</Nullable>
+    <LangVersion>8.0</LangVersion>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+</Project>

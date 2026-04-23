@@ -107,11 +107,38 @@ jobs:
           path: GameData/KspConnected/
 
   # ──────────────────────────────────────────────────────────────────────────
+  # Build the Windows .exe installer
+  # Targets .NET Framework 4.8 — output is ~200 KB, runs on any Windows 10/11
+  # ──────────────────────────────────────────────────────────────────────────
+  build-installer:
+    name: Windows Installer (.exe)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 6 SDK (needed to compile the net48 project)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Build installer exe
+        run: |
+          dotnet build Installer/KspConnectedInstaller.csproj -c Release -nologo
+          copy Installer\bin\Release\net48\KspConnected-Installer.exe KspConnected-Installer.exe
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: KspConnected-Installer.exe
+
+  # ──────────────────────────────────────────────────────────────────────────
   # Assemble the final release packages
   # ──────────────────────────────────────────────────────────────────────────
   release:
     name: Create Release
-    needs: [build-server, build-client]
+    needs: [build-server, build-client, build-installer]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
 
@@ -140,12 +167,13 @@ jobs:
           zip -r ../dist/KSP-Connected-v${{ steps.version.outputs.version }}-mod.zip \
             GameData/KspConnected/ || true
 
-      - name: Organise server zips
+      - name: Organise server zips and installer
         run: |
           mkdir -p dist
-          cp artifacts/server-linux-x64/*.zip dist/
-          cp artifacts/server-win-x64/*.zip   dist/
-          cp artifacts/server-osx-x64/*.zip   dist/
+          cp artifacts/server-linux-x64/*.zip   dist/
+          cp artifacts/server-win-x64/*.zip      dist/
+          cp artifacts/server-osx-x64/*.zip      dist/
+          cp artifacts/windows-installer/*.exe   dist/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -158,30 +186,28 @@ jobs:
 
             ### Installation
 
-            #### Mod (required by all players)
+            #### Windows — One-click installer (easiest)
+            1. Download **`KspConnected-Installer.exe`**
+            2. Run it, point it at your KSP folder, click **Install Now**
+            3. Done — the mod and server are installed automatically
+
+            #### Linux / macOS — Script installer
+            ```bash
+            git clone https://github.com/${{ github.repository }}
+            cd Ksp-Connected
+            chmod +x scripts/install.sh && ./scripts/install.sh
+            ```
+
+            #### Manual (mod zip)
             1. Download `KSP-Connected-v*-mod.zip`
-            2. Extract into your KSP installation folder — the `GameData/KspConnected/` folder will appear automatically.
-
-            #### Server (run by the host)
-            Download the server zip for your operating system:
-            - **Linux**: `KSP-Connected-Server-linux-x64.zip`
-            - **Windows**: `KSP-Connected-Server-win-x64.zip`
-            - **macOS**: `KSP-Connected-Server-osx-x64.zip`
-
-            Run it:
-            ```
-            # Linux / macOS
-            ./KspConnected.Server
-
-            # Windows
-            KspConnected.Server.exe
-            ```
+            2. Extract into your KSP installation folder so `GameData/KspConnected/` appears.
+            3. For the server, also download the zip for your OS and run `KspConnected.Server.exe` (Windows) or `./KspConnected.Server` (Linux/macOS).
 
             See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for full instructions.
 
             > **Note:** If the mod zip contains a `BUILD_LOCALLY.txt` instead of DLLs,
-            > the client plugin must be built from source (KSP assembly stubs were unavailable on CI).
-            > Run `./build.sh client` with `KSP_PATH` set.
+            > KSP assembly stubs were unavailable on CI.  Use the Windows installer or
+            > run `./build.sh client` with `KSP_PATH` set to build locally.
           files: |
             dist/*.zip
           draft: false
