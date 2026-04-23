@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      KSP 1.12 ships with Unity 2019.4 / Mono 6.x.
+      Target net472 (highest .NET Framework that KSP Mono can load reliably).
+      ValueTuple, Stopwatch.GetTimestamp, and async/await are all native here.
+    -->
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>KspConnected.Client</AssemblyName>
+    <RootNamespace>KspConnected.Client</RootNamespace>
+    <Nullable>disable</Nullable>
+    <LangVersion>8.0</LangVersion>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <!--
+      Set KSP_PATH to your KSP installation directory, e.g.:
+        Windows: C:\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program
+        Linux:   ~/.steam/steam/steamapps/common/Kerbal Space Program
+        macOS:   ~/Library/Application Support/Steam/steamapps/common/Kerbal Space Program
+    -->
+    <KspPath Condition="'$(KspPath)'==''">$(HOME)/.steam/steam/steamapps/common/Kerbal Space Program</KspPath>
+    <KspManagedPath>$(KspPath)/KSP_x64_Data/Managed</KspManagedPath>
+  </PropertyGroup>
+
+  <!-- KSP API references — Private=true prevents them being copied to output -->
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(KspManagedPath)/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(KspManagedPath)/UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(KspManagedPath)/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(KspManagedPath)/UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\KspConnected.Shared.csproj" />
+  </ItemGroup>
+
+  <!-- Copy both DLLs to GameData after build -->
+  <Target Name="CopyToGameData" AfterTargets="Build">
+    <Copy SourceFiles="$(OutputPath)KspConnected.Client.dll"
+          DestinationFolder="$(MSBuildProjectDirectory)\..\GameData\KspConnected\Plugins" />
+    <Copy SourceFiles="$(OutputPath)KspConnected.Shared.dll"
+          DestinationFolder="$(MSBuildProjectDirectory)\..\GameData\KspConnected\Plugins" />
+    <Message Importance="High" Text="Copied DLLs to GameData/KspConnected/Plugins/" />
+  </Target>
+
+</Project>

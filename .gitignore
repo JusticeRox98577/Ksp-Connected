@@ -1,0 +1,21 @@
+# Build output
+**/bin/
+**/obj/
+dist/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Rider
+.idea/
+
+# Compiled DLLs in GameData (built by the build scripts)
+GameData/KspConnected/Plugins/*.dll
+GameData/KspConnected/Plugins/*.pdb
+
+# OS
+.DS_Store
+Thumbs.db

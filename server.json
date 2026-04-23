@@ -1,0 +1,6 @@
+{
+  "Port": 7654,
+  "MaxPlayers": 16,
+  "ServerName": "My KSP Server",
+  "WelcomeMessage": "Welcome to KSP-Connected! Have fun exploring the Kerbol system together."
+}
