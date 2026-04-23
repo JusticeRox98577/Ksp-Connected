@@ -12,8 +12,9 @@ namespace KspConnected.Client.Core
 
     public class ConnectionManager
     {
-        public ConnectionState State { get; private set; } = ConnectionState.Disconnected;
-        public int LocalPlayerId { get; private set; } = -1;
+        public ConnectionState State         { get; private set; } = ConnectionState.Disconnected;
+        public int             LocalPlayerId { get; private set; } = -1;
+        public string          RoomCode      { get; private set; } = "";
 
         // Inbound message events — fired on Unity main thread via ThreadDispatcher
         public event Action<HelloAckMessage>      OnHelloAck;
@@ -22,14 +23,28 @@ namespace KspConnected.Client.Core
         public event Action<VesselConfigMessage>  OnVesselConfig;
         public event Action<ChatMessage>          OnChat;
         public event Action<TimeSyncReplyMessage> OnTimeSyncReply;
-        public event Action<string>               OnDisconnected;  // reason
+        public event Action<string>               OnDisconnected;
+        public event Action<string>               OnRoomCreated;   // fires with room code on relay create
 
-        private TcpClient   _tcp;
+        private TcpClient     _tcp;
         private NetworkStream _stream;
-        private Thread      _readThread;
+        private Thread        _readThread;
         private readonly object _writeLock = new object();
 
+        /// <summary>Connect directly (host must have port forwarded).</summary>
         public void Connect(string host, int port, string playerName)
+            => ConnectInternal(host, port, playerName, isRelayHost: false, roomCode: "");
+
+        /// <summary>Connect to a relay server and create a room. Friends use the returned code to join.</summary>
+        public void CreateRelayRoom(string relayHost, int port, string playerName)
+            => ConnectInternal(relayHost, port, playerName, isRelayHost: true, roomCode: "");
+
+        /// <summary>Connect to a relay server and join a room by its 6-character code.</summary>
+        public void JoinRelayRoom(string relayHost, int port, string roomCode, string playerName)
+            => ConnectInternal(relayHost, port, playerName, isRelayHost: false, roomCode: roomCode);
+
+        private void ConnectInternal(string host, int port, string playerName,
+                                     bool isRelayHost, string roomCode)
         {
             if (State != ConnectionState.Disconnected)
             {
@@ -51,7 +66,9 @@ namespace KspConnected.Client.Core
 
                     SendPayload(MessageType.Hello, new HelloMessage
                     {
-                        PlayerName = playerName,
+                        PlayerName  = playerName,
+                        IsRelayHost = isRelayHost,
+                        RoomCode    = roomCode ?? "",
                     }.ToPayload());
 
                     _readThread = new Thread(ReadLoop) { IsBackground = true, Name = "KspConnected-Recv" };
@@ -61,7 +78,8 @@ namespace KspConnected.Client.Core
                 {
                     State = ConnectionState.Disconnected;
                     Logger.Error("Connect failed: " + ex.Message);
-                    ThreadDispatcher.Instance?.Enqueue(() => OnDisconnected?.Invoke("Connect failed: " + ex.Message));
+                    ThreadDispatcher.Instance?.Enqueue(
+                        () => OnDisconnected?.Invoke("Connect failed: " + ex.Message));
                 }
             }, null);
         }
@@ -130,7 +148,13 @@ namespace KspConnected.Client.Core
             {
                 case MessageType.HelloAck:
                     var ack = HelloAckMessage.FromPayload(payload);
-                    if (ack.Accepted) LocalPlayerId = ack.AssignedPlayerId;
+                    if (ack.Accepted)
+                    {
+                        LocalPlayerId = ack.AssignedPlayerId;
+                        RoomCode = ack.RoomCode ?? "";
+                        if (!string.IsNullOrEmpty(RoomCode))
+                            ThreadDispatcher.Instance.Enqueue(() => OnRoomCreated?.Invoke(RoomCode));
+                    }
                     ThreadDispatcher.Instance.Enqueue(() => OnHelloAck?.Invoke(ack));
                     break;
 
@@ -177,6 +201,7 @@ namespace KspConnected.Client.Core
         {
             State = ConnectionState.Disconnected;
             LocalPlayerId = -1;
+            RoomCode = "";
             try { _stream?.Close(); } catch { }
             try { _tcp?.Close(); }    catch { }
             _stream = null;

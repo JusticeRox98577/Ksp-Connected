@@ -20,7 +20,7 @@ namespace KspConnected.Server.Handlers
                 $"({payload.Length} bytes compressed).");
 
             byte[] fwd = msg.ToPayload();
-            server.Registry.Broadcast(MessageType.VesselConfig, fwd, excludePlayerId: session.PlayerId);
+            server.GetRegistry(session).Broadcast(MessageType.VesselConfig, fwd, excludePlayerId: session.PlayerId);
         }
     }
 }

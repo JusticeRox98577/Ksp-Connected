@@ -11,6 +11,7 @@ namespace KspConnected.Server.Core
     {
         public int    PlayerId    { get; private set; } = -1;
         public string PlayerName  { get; private set; } = "";
+        public string RoomCode    { get; set;          } = "";
         public bool   IsConnected { get; private set; } = true;
 
         private readonly TcpClient      _tcp;

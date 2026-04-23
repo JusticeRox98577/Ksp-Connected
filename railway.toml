@@ -1,0 +1,9 @@
+[build]
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "dotnet KspConnected.Server.dll --relay --port $PORT"
+healthcheckPath = ""
+
+[[services]]
+name = "ksp-connected-relay"

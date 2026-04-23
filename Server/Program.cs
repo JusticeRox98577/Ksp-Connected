@@ -15,19 +15,24 @@ namespace KspConnected.Server
 
             var config = ServerConfig.Load();
 
-            // Override from CLI: --port 7654 --max-players 8
-            for (int i = 0; i < args.Length - 1; i++)
+            // Override from CLI: --port 7654 --max-players 8 --relay
+            for (int i = 0; i < args.Length; i++)
             {
                 switch (args[i].ToLowerInvariant())
                 {
                     case "--port":
-                        if (int.TryParse(args[i + 1], out int port)) config.Port = port;
+                        if (i + 1 < args.Length && int.TryParse(args[++i], out int port))
+                            config.Port = port;
                         break;
                     case "--max-players":
-                        if (int.TryParse(args[i + 1], out int mp)) config.MaxPlayers = mp;
+                        if (i + 1 < args.Length && int.TryParse(args[++i], out int mp))
+                            config.MaxPlayers = mp;
                         break;
                     case "--name":
-                        config.ServerName = args[i + 1];
+                        if (i + 1 < args.Length) config.ServerName = args[++i];
+                        break;
+                    case "--relay":
+                        config.RelayMode = true;
                         break;
                 }
             }

@@ -16,9 +16,8 @@ namespace KspConnected.Server.Handlers
 
             System.Console.WriteLine($"[Chat] {msg.SenderName}: {msg.Text}");
 
-            // Broadcast to all clients including sender (so sender sees their own message)
             byte[] fwd = msg.ToPayload();
-            server.Registry.Broadcast(MessageType.Chat, fwd);
+            server.GetRegistry(session).Broadcast(MessageType.Chat, fwd);
         }
     }
 }

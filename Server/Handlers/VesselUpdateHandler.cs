@@ -14,11 +14,11 @@ namespace KspConnected.Server.Handlers
             msg.State.PlayerId   = session.PlayerId;
             msg.State.PlayerName = session.PlayerName;
 
-            server.Registry.UpdateVessel(session.PlayerId, msg.State);
+            var reg = server.GetRegistry(session);
+            reg.UpdateVessel(session.PlayerId, msg.State);
 
-            // Forward to all other players
             byte[] fwd = msg.ToPayload();
-            server.Registry.Broadcast(MessageType.VesselUpdate, fwd, excludePlayerId: session.PlayerId);
+            reg.Broadcast(MessageType.VesselUpdate, fwd, excludePlayerId: session.PlayerId);
         }
     }
 }

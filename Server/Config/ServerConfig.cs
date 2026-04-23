@@ -10,6 +10,7 @@ namespace KspConnected.Server.Config
         public int    MaxPlayers     { get; set; } = 16;
         public string ServerName     { get; set; } = "KSP-Connected Server";
         public string WelcomeMessage { get; set; } = "Welcome to KSP-Connected!";
+        public bool   RelayMode      { get; set; } = false;
 
         private static readonly JsonSerializerOptions JsonOpts = new JsonSerializerOptions
         {

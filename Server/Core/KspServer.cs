@@ -10,13 +10,28 @@ namespace KspConnected.Server.Core
 {
     public class KspServer
     {
-        public  ServerConfig   Config   { get; }
-        public  PlayerRegistry Registry { get; } = new PlayerRegistry();
+        public  ServerConfig      Config     { get; }
+        public  PlayerRegistry    Registry   { get; } = new PlayerRegistry();
+        public  RelayRoomManager  RelayRooms { get; } = new RelayRoomManager();
 
-        private TcpListener        _listener;
-        private CancellationToken  _cancel;
+        private TcpListener       _listener;
+        private CancellationToken _cancel;
 
         public KspServer(ServerConfig config) => Config = config;
+
+        /// <summary>
+        /// Returns the PlayerRegistry responsible for this session.
+        /// In relay mode each room has its own registry; direct mode uses the global one.
+        /// </summary>
+        public PlayerRegistry GetRegistry(ClientSession session)
+        {
+            if (Config.RelayMode && !string.IsNullOrEmpty(session.RoomCode))
+            {
+                var reg = RelayRooms.GetRoomRegistry(session.RoomCode);
+                if (reg != null) return reg;
+            }
+            return Registry;
+        }
 
         public async Task RunAsync(CancellationToken cancellationToken)
         {
@@ -24,7 +39,10 @@ namespace KspConnected.Server.Core
             _listener = new TcpListener(IPAddress.Any, Config.Port);
             _listener.Start();
 
-            Console.WriteLine($"[Server] '{Config.ServerName}' listening on port {Config.Port}");
+            string mode = Config.RelayMode
+                ? "RELAY — clients connect with a room code, no port forwarding needed"
+                : "direct";
+            Console.WriteLine($"[Server] '{Config.ServerName}' [{mode}] on port {Config.Port}");
             Console.WriteLine($"[Server] Max players: {Config.MaxPlayers}");
 
             try
@@ -32,17 +50,17 @@ namespace KspConnected.Server.Core
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     TcpClient tcp = await _listener.AcceptTcpClientAsync();
-                    tcp.NoDelay  = true;
+                    tcp.NoDelay = true;
 
-                    if (Registry.Count >= Config.MaxPlayers)
+                    // In relay mode there is no global cap; each room enforces its own limit
+                    if (!Config.RelayMode && Registry.Count >= Config.MaxPlayers)
                     {
                         Console.WriteLine("[Server] Server full — rejecting connection.");
                         tcp.Close();
                         continue;
                     }
 
-                    var session = new ClientSession(tcp, this);
-                    session.Start();
+                    new ClientSession(tcp, this).Start();
                 }
             }
             catch (OperationCanceledException) { }
@@ -61,12 +79,16 @@ namespace KspConnected.Server.Core
         {
             if (session.PlayerId < 0) return;
 
-            Registry.Remove(session.PlayerId, out _);
+            var reg = GetRegistry(session);
+            reg.Remove(session.PlayerId, out _);
+
             Console.WriteLine($"[Server] Player '{session.PlayerName}' (#{session.PlayerId}) left. Reason: {reason}");
 
-            // Broadcast updated player list
-            var listPayload = Registry.BuildPlayerList().ToPayload();
-            Registry.Broadcast(MessageType.PlayerList, listPayload);
+            var listPayload = reg.BuildPlayerList().ToPayload();
+            reg.Broadcast(MessageType.PlayerList, listPayload);
+
+            if (Config.RelayMode && !string.IsNullOrEmpty(session.RoomCode) && reg.Count == 0)
+                RelayRooms.CloseRoom(session.RoomCode);
         }
     }
 }

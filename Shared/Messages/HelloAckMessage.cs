@@ -1,4 +1,3 @@
-using System.IO;
 using KspConnected.Shared.Protocol;
 
 namespace KspConnected.Shared.Messages
@@ -6,9 +5,10 @@ namespace KspConnected.Shared.Messages
     public class HelloAckMessage
     {
         public int    AssignedPlayerId;
-        public string ServerName = "KSP-Connected Server";
-        public bool   Accepted   = true;
-        public string RejectReason = "";  // non-empty when Accepted == false
+        public string ServerName    = "KSP-Connected Server";
+        public bool   Accepted      = true;
+        public string RejectReason  = "";
+        public string RoomCode      = "";  // filled by relay server; empty for direct connections
 
         public byte[] ToPayload() => MessageFrame.BuildPayload(w =>
         {
@@ -16,6 +16,7 @@ namespace KspConnected.Shared.Messages
             w.Write(ServerName);
             w.Write(Accepted);
             w.Write(RejectReason);
+            w.Write(RoomCode);
         });
 
         public static HelloAckMessage FromPayload(byte[] payload) =>
@@ -25,6 +26,7 @@ namespace KspConnected.Shared.Messages
                 ServerName       = r.ReadString(),
                 Accepted         = r.ReadBoolean(),
                 RejectReason     = r.ReadString(),
+                RoomCode         = r.ReadString(),
             });
     }
 }

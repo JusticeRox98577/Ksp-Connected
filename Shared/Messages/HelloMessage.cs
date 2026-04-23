@@ -1,4 +1,3 @@
-using System.IO;
 using KspConnected.Shared.Protocol;
 
 namespace KspConnected.Shared.Messages
@@ -7,11 +6,15 @@ namespace KspConnected.Shared.Messages
     {
         public int    ProtocolVersion = ProtocolConstants.Version;
         public string PlayerName      = "";
+        public bool   IsRelayHost     = false;  // true = create a new relay room
+        public string RoomCode        = "";     // non-empty = join this relay room
 
         public byte[] ToPayload() => MessageFrame.BuildPayload(w =>
         {
             w.Write(ProtocolVersion);
             w.Write(PlayerName);
+            w.Write(IsRelayHost);
+            w.Write(RoomCode);
         });
 
         public static HelloMessage FromPayload(byte[] payload) =>
@@ -19,6 +22,8 @@ namespace KspConnected.Shared.Messages
             {
                 ProtocolVersion = r.ReadInt32(),
                 PlayerName      = r.ReadString(),
+                IsRelayHost     = r.ReadBoolean(),
+                RoomCode        = r.ReadString(),
             });
     }
 }

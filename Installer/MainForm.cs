@@ -110,7 +110,7 @@ namespace KspConnectedInstaller
             _browseBtn = MakeButton("Browse…", 406, 57, 80);
             _detectBtn = MakeButton("Auto-detect", 490, 57, 94);
             _browseBtn.Click += OnBrowse;
-            _detectBtn.Click += (_, __) => TryAutoDetect();
+            _detectBtn.Click += (_, __) => TryAutoDetect(userInitiated: true);
 
             // Separator
             var sep1 = Separator(16, 100, 568);
@@ -276,7 +276,7 @@ namespace KspConnectedInstaller
 
         // ── KSP auto-detection ────────────────────────────────────────────────
 
-        private void TryAutoDetect()
+        private void TryAutoDetect(bool userInitiated = false)
         {
             string found = AutoDetectKsp();
             if (found != null)
@@ -284,7 +284,7 @@ namespace KspConnectedInstaller
                 _kspPathBox.Text = found;
                 Log("Auto-detected KSP at: " + found, false);
             }
-            else
+            else if (userInitiated)
             {
                 Log("KSP not found automatically — please Browse to your KSP folder.", false);
             }
@@ -292,19 +292,25 @@ namespace KspConnectedInstaller
 
         private string AutoDetectKsp()
         {
-            // Common Steam paths
             string pf86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
             string pf   = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-            string[] candidates =
+
+            // Common Steam paths on the system drive
+            string[] fixedCandidates =
             {
                 Path.Combine(pf86, @"Steam\steamapps\common\Kerbal Space Program"),
                 Path.Combine(pf,   @"Steam\steamapps\common\Kerbal Space Program"),
+                // GOG
+                Path.Combine(pf86, @"GOG Galaxy\Games\Kerbal Space Program"),
+                Path.Combine(pf,   @"GOG Galaxy\Games\Kerbal Space Program"),
+                // Epic
+                Path.Combine(pf,   @"Epic Games\KerbalSpaceProgram"),
             };
 
-            foreach (string c in candidates)
+            foreach (string c in fixedCandidates)
                 if (IsKsp(c)) return c;
 
-            // Parse Steam library folders VDF
+            // Parse Steam library folders VDF (handles Steam libraries on other drives)
             string vdfPath = Path.Combine(pf86, @"Steam\config\libraryfolders.vdf");
             if (File.Exists(vdfPath))
             {
@@ -314,6 +320,31 @@ namespace KspConnectedInstaller
                     string p = Path.Combine(
                         m.Groups[1].Value.Replace(@"\\", @"\"),
                         @"steamapps\common\Kerbal Space Program");
+                    if (IsKsp(p)) return p;
+                }
+            }
+
+            // Scan all available drive letters for common installation sub-paths
+            string[] subPaths =
+            {
+                @"Kerbal Space Program",
+                @"KSP\Kerbal Space Program",
+                @"Games\Kerbal Space Program",
+                @"Games\KSP",
+                @"SteamLibrary\steamapps\common\Kerbal Space Program",
+                @"Steam\steamapps\common\Kerbal Space Program",
+                @"GOG Games\Kerbal Space Program",
+            };
+
+            foreach (char drive in "CDEFGHIJKLMNOPQRSTUVWXYZ")
+            {
+                string root = drive + @":\";
+                try { if (!Directory.Exists(root)) continue; }
+                catch { continue; }
+
+                foreach (string sub in subPaths)
+                {
+                    string p = Path.Combine(root, sub);
                     if (IsKsp(p)) return p;
                 }
             }
