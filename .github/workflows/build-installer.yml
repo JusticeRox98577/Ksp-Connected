@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: claude/ksp-multiplayer-mod-hyfzh
+          ref: main
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -38,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: claude/ksp-multiplayer-mod-hyfzh
+          ref: main
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -71,7 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: claude/ksp-multiplayer-mod-hyfzh
+          ref: main
 
       - uses: actions/download-artifact@v4
         with:
@@ -90,7 +90,7 @@ jobs:
           tag_name: v1.0.1-alpha
           name: "KSP-Connected v1.0.1-alpha — Pre-release"
           prerelease: true
-          target_commitish: claude/ksp-multiplayer-mod-hyfzh
+          target_commitish: main
           body: |
             ## KSP-Connected v1.0.1-alpha
 
