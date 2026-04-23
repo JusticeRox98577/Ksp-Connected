@@ -20,7 +20,7 @@
 #define AppVerShort  "1.0.1"
 #define AppPublisher "KSP-Connected Contributors"
 #define AppURL       "https://github.com/JusticeRox98577/Ksp-Connected"
-#define ServerDll    "KspConnected.Server.dll"
+#define ServerExe    "KspConnected.Server.exe"
 
 ; ── [Setup] ──────────────────────────────────────────────────────────────────
 
@@ -89,7 +89,7 @@ Source: "..\GameData\KspConnected\*"; \
   Components: mod
 
 ; ── server binaries → Program Files\KSP-Connected\Server\
-Source: "..\Server\bin\Release\net6.0\*"; \
+Source: "..\dist\server-win\*"; \
   DestDir: "{app}\Server"; \
   Flags: ignoreversion recursesubdirs createallsubdirs; \
   Components: server
@@ -110,16 +110,15 @@ Source: "..\README.md"; \
 [Icons]
 ; Start Menu → run server (direct mode)
 Name: "{group}\KSP-Connected Server"; \
-  FileName: "dotnet"; \
-  Parameters: """{app}\Server\{#ServerDll}"""; \
+  FileName: "{app}\Server\{#ServerExe}"; \
   WorkingDir: "{app}\Server"; \
   Comment: "Start the KSP-Connected multiplayer server"; \
   Components: server
 
 ; Start Menu → run server (relay mode — no port forwarding)
 Name: "{group}\KSP-Connected Server (Relay mode)"; \
-  FileName: "dotnet"; \
-  Parameters: """{app}\Server\{#ServerDll}"" --relay"; \
+  FileName: "{app}\Server\{#ServerExe}"; \
+  Parameters: "--relay"; \
   WorkingDir: "{app}\Server"; \
   Comment: "Start in relay mode — players join with a room code, no port forwarding needed"; \
   Components: server
@@ -132,8 +131,7 @@ Name: "{group}\{cm:UninstallProgram,{#AppName}}"; FileName: "{uninstallexe}"
 
 ; Desktop shortcut (opt-in task)
 Name: "{autodesktop}\KSP-Connected Server"; \
-  FileName: "dotnet"; \
-  Parameters: """{app}\Server\{#ServerDll}"""; \
+  FileName: "{app}\Server\{#ServerExe}"; \
   WorkingDir: "{app}\Server"; \
   Comment: "Start the KSP-Connected multiplayer server"; \
   Tasks: desktopicon; \

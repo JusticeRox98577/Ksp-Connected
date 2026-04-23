@@ -7,6 +7,7 @@ permissions:
   contents: write
 
 jobs:
+  # ── Build the Inno Setup installer (.exe) on Windows ─────────────────────────
   build-installer:
     name: Windows Installer
     runs-on: windows-latest
@@ -19,16 +20,54 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
-      - name: Build installer exe
+      # Build shared library
+      - name: Build shared
+        run: dotnet build Shared/KspConnected.Shared.csproj -c Release -nologo -v q
+
+      # Build client plugin using KSP stubs (no real KSP install needed on CI)
+      - name: Build client plugin (stubs)
+        run: dotnet build Client/KspConnected.Client.csproj -c Release -nologo -v q
+
+      # Copy plugin DLLs into GameData so Inno Setup can find them
+      - name: Copy plugin DLLs to GameData
         run: |
-          dotnet build Installer/KspConnectedInstaller.csproj -c Release -nologo
-          copy Installer\bin\Release\net48\KspConnected-Installer.exe KspConnected-Installer.exe
+          New-Item -ItemType Directory -Force -Path GameData\KspConnected\Plugins | Out-Null
+          Copy-Item Client\bin\Release\net472\KspConnected.Client.dll  GameData\KspConnected\Plugins\ -Force
+          Copy-Item Client\bin\Release\net472\KspConnected.Shared.dll  GameData\KspConnected\Plugins\ -Force
+        shell: powershell
+
+      # Publish self-contained server for Windows
+      - name: Publish server (win-x64, self-contained)
+        run: |
+          dotnet publish Server/KspConnected.Server.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:DebugType=none `
+            -nologo -v q `
+            -o dist/server-win
+          Copy-Item server.json dist/server-win/ -Force
+        shell: powershell
+
+      # Install Inno Setup 6 via Chocolatey
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      # Compile the installer
+      - name: Compile installer with ISCC
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\KSP-Connected.iss
+        shell: powershell
+
+      - name: Rename installer artifact
+        run: |
+          Copy-Item "dist\installer\KSP-Connected-v1.0.1-alpha-Setup.exe" "KSP-Connected-v1.0.1-alpha-Setup.exe" -Force
+        shell: powershell
 
       - uses: actions/upload-artifact@v4
         with:
           name: installer
-          path: KspConnected-Installer.exe
+          path: KSP-Connected-v1.0.1-alpha-Setup.exe
 
+  # ── Build self-contained server zips for all platforms ───────────────────────
   build-server:
     name: Server (${{ matrix.rid }})
     runs-on: ubuntu-latest
@@ -64,6 +103,7 @@ jobs:
           name: server-${{ matrix.rid }}
           path: dist/KSP-Connected-Server-${{ matrix.rid }}.zip
 
+  # ── Publish GitHub release with all artifacts ─────────────────────────────────
   release:
     name: Publish Release
     needs: [build-installer, build-server]
@@ -80,10 +120,10 @@ jobs:
       - name: Organise files
         run: |
           mkdir -p dist
-          cp artifacts/installer/KspConnected-Installer.exe  dist/
-          cp artifacts/server-linux-x64/*.zip                dist/
-          cp artifacts/server-win-x64/*.zip                  dist/
-          cp artifacts/server-osx-x64/*.zip                  dist/
+          cp artifacts/installer/KSP-Connected-v1.0.1-alpha-Setup.exe  dist/
+          cp artifacts/server-linux-x64/*.zip                           dist/
+          cp artifacts/server-win-x64/*.zip                             dist/
+          cp artifacts/server-osx-x64/*.zip                             dist/
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -103,16 +143,17 @@ jobs:
             ### What's new in v1.0.1
             - **Relay mode** — play without port forwarding. Host creates a room and shares a 6-character code; friends join using the new Relay tab. Deploy the relay server free on Railway / Render / Fly.io (Dockerfile included).
             - **Improved KSP auto-detection** — installer now scans every drive letter (C: through Z:) and checks GOG, Epic Games, and custom paths like `D:\KSP\`, not just the default Steam location.
+            - **Self-contained server** — the server `.exe` ships with its own .NET runtime; no separate .NET installation required to run the server.
             - **Fixed duplicate log message** — "KSP not found" no longer appears twice on startup.
 
             ---
 
             ### 🖥️ Windows — One-click installer (recommended)
-            1. Download **`KspConnected-Installer.exe`** below
+            1. Download **`KSP-Connected-v1.0.1-alpha-Setup.exe`** below
             2. Run it — auto-detects KSP on any drive (Steam, GOG, Epic, custom folder)
-            3. Click **Install Now**
+            3. Click **Install**
 
-            > Requires .NET 6 SDK ([download](https://dotnet.microsoft.com/download/dotnet/6.0)) — the installer will tell you if it's missing.
+            > No extra runtime needed — the server is fully self-contained.
 
             ---
 
@@ -139,7 +180,7 @@ jobs:
             - In-flight HUD, in-game chat, NTP-style time sync
             - **Relay mode** — play without port forwarding via room codes
           files: |
-            dist/KspConnected-Installer.exe
+            dist/KSP-Connected-v1.0.1-alpha-Setup.exe
             dist/KSP-Connected-Server-linux-x64.zip
             dist/KSP-Connected-Server-win-x64.zip
             dist/KSP-Connected-Server-osx-x64.zip

@@ -3,8 +3,8 @@
 ::  build-for-installer.bat
 ::  Run this BEFORE opening installer\KSP-Connected.iss
 :: ============================================================
-::  Compiles the mod plugin and server so Inno Setup can
-::  bundle the DLLs into the installer .exe.
+::  Compiles the mod plugin and self-contained server so Inno
+::  Setup can bundle everything into the installer .exe.
 ::
 ::  Usage:
 ::    build-for-installer.bat
@@ -71,7 +71,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-:: ── 3. Build ─────────────────────────────────────────────────────────────────
+:: ── 3. Build shared + plugin ──────────────────────────────────────────────────
 
 echo Building shared library...
 dotnet build Shared\KspConnected.Shared.csproj -c Release -nologo -v q
@@ -82,11 +82,22 @@ dotnet build Client\KspConnected.Client.csproj -c Release -nologo -v q ^
   -p:KspPath="%KSP_PATH%"
 if errorlevel 1 ( echo FAILED: Client plugin & exit /b 1 )
 
-echo Building server...
-dotnet build Server\KspConnected.Server.csproj -c Release -nologo -v q
+:: ── 4. Publish self-contained server (win-x64) ───────────────────────────────
+
+echo Publishing self-contained server (win-x64)...
+dotnet publish Server\KspConnected.Server.csproj ^
+  -c Release -r win-x64 --self-contained true ^
+  -p:PublishSingleFile=true -p:DebugType=none ^
+  -nologo -v q ^
+  -o dist\server-win
 if errorlevel 1 ( echo FAILED: Server & exit /b 1 )
 
-:: ── 4. Done ──────────────────────────────────────────────────────────────────
+:: Copy default config if it doesn't exist in output
+if not exist "dist\server-win\server.json" (
+  copy server.json dist\server-win\server.json >nul
+)
+
+:: ── 5. Done ──────────────────────────────────────────────────────────────────
 
 echo.
 echo  ============================================================
