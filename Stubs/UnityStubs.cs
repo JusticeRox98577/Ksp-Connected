@@ -7,9 +7,12 @@ namespace UnityEngine
         public static void DontDestroyOnLoad(Object obj) { }
     }
 
+    public class GameObject : Object { }
+
     public class Component : Object
     {
-        public Transform transform { get; } = new Transform();
+        public Transform  transform  { get; } = new Transform();
+        public GameObject gameObject { get; } = new GameObject();
     }
 
     public class Behaviour : Component { public bool enabled { get; set; } = true; }
@@ -131,6 +134,30 @@ namespace UnityEngine
 
     public enum FocusType { Native, Keyboard, Passive }
 
+    public enum EventType
+    {
+        MouseDown, MouseUp, MouseMove, MouseDrag,
+        KeyDown, KeyUp, ScrollWheel,
+        Repaint, Layout, Used, Ignore,
+    }
+
+    public enum KeyCode
+    {
+        None = 0, Return = 13, KeypadEnter = 271,
+        Escape = 27, Space = 32, Backspace = 8,
+        UpArrow = 273, DownArrow = 274, LeftArrow = 276, RightArrow = 275,
+    }
+
+    public class Event
+    {
+        public static Event current { get; } = new Event();
+        public EventType type    { get; set; }
+        public KeyCode   keyCode { get; set; }
+        public bool      shift   { get; set; }
+        public bool      control { get; set; }
+        public bool      alt     { get; set; }
+    }
+
     public class Font : Object { }
 
     public class GUIStyleState
@@ -191,6 +218,7 @@ namespace UnityEngine
         public static GUILayoutOption ExpandWidth(bool v) => new GUILayoutOption();
 
         public static void   Label(string text, params GUILayoutOption[] opts) { }
+        public static void   Label(string text, GUIStyle style, params GUILayoutOption[] opts) { }
         public static bool   Button(string text, params GUILayoutOption[] opts) => false;
         public static bool   Button(string text, GUIStyle style, params GUILayoutOption[] opts) => false;
         public static string TextField(string text, params GUILayoutOption[] opts) => text ?? "";
