@@ -102,6 +102,7 @@ namespace UnityEngine
 
     public class Camera : Component
     {
+        public static Camera main { get; } = null;
         public Vector3 WorldToScreenPoint(Vector3 position) => Vector3.zero;
     }
 
@@ -205,6 +206,7 @@ namespace UnityEngine
         public static void   FocusControl(string name) { }
         public static void   SetNextControlName(string name) { }
         public static string GetNameOfFocusedControl() => "";
+        public static Color  color { get; set; } = Color.white;
         public static void   BeginGroup(Rect pos) { }
         public static void   EndGroup() { }
     }
