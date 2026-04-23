@@ -388,15 +388,8 @@ namespace KspConnectedInstaller
                 return;
             }
 
+            // repoRoot may be null here — InstallWorker will download source from GitHub if so
             string repoRoot = FindRepoRoot();
-            if (repoRoot == null)
-            {
-                MessageBox.Show(
-                    "Could not find the KSP-Connected source files next to this installer.\n\n" +
-                    "Make sure KspConnected-Installer.exe is inside the KSP-Connected repository folder.",
-                    "Source Files Missing", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
 
             // Lock UI
             _busy = true;

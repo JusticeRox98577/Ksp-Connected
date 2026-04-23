@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
+using System.Net;
 using System.Text.RegularExpressions;
 
 namespace KspConnectedInstaller
@@ -8,18 +10,22 @@ namespace KspConnectedInstaller
     /// <summary>
     /// All installation logic runs here on a background thread.
     /// Callbacks are used to report progress back to the UI.
+    /// If repoRoot is null the source is downloaded from GitHub automatically.
     /// </summary>
     public class InstallWorker
     {
         private readonly string _kspPath;
-        private readonly string _repoRoot;
+        private          string _repoRoot;   // may start null; filled by Step0
         private readonly bool   _installServer;
         private readonly bool   _createShortcut;
 
-        private readonly Action<string, bool> _log;       // (message, isError)
-        private readonly Action<int>          _progress;  // 0–100
+        private readonly Action<string, bool> _log;
+        private readonly Action<int>          _progress;
         private readonly Action               _onDone;
         private readonly Action<string>       _onError;
+
+        private const string SourceZipUrl =
+            "https://github.com/JusticeRox98577/Ksp-Connected/archive/refs/heads/main.zip";
 
         public InstallWorker(
             string kspPath, string repoRoot,
@@ -41,6 +47,7 @@ namespace KspConnectedInstaller
         {
             try
             {
+                Step0_EnsureSource();
                 Step1_ValidateKsp();
                 Step2_CheckDotnetSdk();
                 Step3_BuildShared();
@@ -64,13 +71,48 @@ namespace KspConnectedInstaller
 
         // ── steps ────────────────────────────────────────────────────────────
 
+        private void Step0_EnsureSource()
+        {
+            if (_repoRoot != null)
+            {
+                _log("Source found at: " + _repoRoot, false);
+                return;
+            }
+
+            _log("Source not found locally — downloading from GitHub...", false);
+
+            string tempDir = Path.Combine(Path.GetTempPath(), "KspConnected-install");
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
+            Directory.CreateDirectory(tempDir);
+
+            string zipPath = Path.Combine(tempDir, "source.zip");
+
+            using (var client = new WebClient())
+            {
+                client.DownloadFile(SourceZipUrl, zipPath);
+            }
+            _log("  Download complete. Extracting...", false);
+
+            ZipFile.ExtractToDirectory(zipPath, tempDir);
+
+            // GitHub ZIP extracts to a sub-folder named "Ksp-Connected-main"
+            string[] dirs = Directory.GetDirectories(tempDir);
+            if (dirs.Length == 0)
+                throw new Exception("Failed to extract source archive.");
+
+            _repoRoot = dirs[0];
+            _log("  Source ready.", false);
+            _progress(5);
+        }
+
         private void Step1_ValidateKsp()
         {
             _log("Validating KSP installation...", false);
             if (!Directory.Exists(Path.Combine(_kspPath, "GameData")))
                 throw new Exception($"'GameData' folder not found in: {_kspPath}");
             _log("  KSP path OK: " + _kspPath, false);
-            _progress(5);
+            _progress(10);
         }
 
         private void Step2_CheckDotnetSdk()
@@ -84,14 +126,14 @@ namespace KspConnectedInstaller
                     "  https://dotnet.microsoft.com/download/dotnet/6.0\n\n" +
                     "Then re-run this installer.");
             _log("  SDK found: " + dotnet, false);
-            _progress(10);
+            _progress(15);
         }
 
         private void Step3_BuildShared()
         {
             _log("Building shared library...", false);
             Dotnet($"build \"{Proj("Shared", "KspConnected.Shared.csproj")}\" -c Release -nologo -v q");
-            _progress(30);
+            _progress(35);
         }
 
         private void Step4_BuildPlugin()
@@ -100,7 +142,7 @@ namespace KspConnectedInstaller
             Dotnet($"build \"{Proj("Client", "KspConnected.Client.csproj")}\" " +
                    $"-c Release -nologo -v q " +
                    $"-p:KspPath=\"{_kspPath}\"");
-            _progress(60);
+            _progress(65);
         }
 
         private void Step5_CopyToGameData()
@@ -117,14 +159,14 @@ namespace KspConnectedInstaller
 
             CopyDir(src, dest);
             _log("  Installed to: " + dest, false);
-            _progress(75);
+            _progress(80);
         }
 
         private void Step6_BuildServer()
         {
             _log("Building multiplayer server...", false);
             Dotnet($"build \"{Proj("Server", "KspConnected.Server.csproj")}\" -c Release -nologo -v q");
-            _progress(92);
+            _progress(93);
         }
 
         private void Step7_CreateShortcut()
@@ -136,8 +178,7 @@ namespace KspConnectedInstaller
                 string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
                 string lnk     = Path.Combine(desktop, "KSP-Connected Server.lnk");
 
-                // Use WScript.Shell via reflection — avoids Microsoft.CSharp dependency
-                var flags  = System.Reflection.BindingFlags.InvokeMethod;
+                var flags   = System.Reflection.BindingFlags.InvokeMethod;
                 var setProp = System.Reflection.BindingFlags.SetProperty;
                 Type   shellT = Type.GetTypeFromProgID("WScript.Shell");
                 object shell  = Activator.CreateInstance(shellT);
@@ -171,7 +212,8 @@ namespace KspConnectedInstaller
             string[] candidates =
             {
                 "dotnet",
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "dotnet.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                             "dotnet", "dotnet.exe"),
             };
 
             foreach (string c in candidates)
@@ -188,7 +230,6 @@ namespace KspConnectedInstaller
                     string ver = p.StandardOutput.ReadToEnd().Trim();
                     p.WaitForExit();
 
-                    // Accept SDK 6, 7, 8, 9 …
                     if (p.ExitCode == 0 && Regex.IsMatch(ver, @"^[6-9]\.|^[1-9]\d+\."))
                     {
                         _dotnetExe = c;
@@ -214,8 +255,6 @@ namespace KspConnectedInstaller
             };
 
             var p = Process.Start(psi);
-
-            // Stream output to log in real time
             p.OutputDataReceived += (_, e) => { if (e.Data != null) _log("  " + e.Data, false); };
             p.ErrorDataReceived  += (_, e) => { if (e.Data != null) _log("  " + e.Data, true);  };
             p.BeginOutputReadLine();
