@@ -136,15 +136,18 @@ namespace KspConnectedInstaller
                 string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
                 string lnk     = Path.Combine(desktop, "KSP-Connected Server.lnk");
 
-                // Use Windows Script Host COM object — available on every Windows PC
+                // Use WScript.Shell via reflection — avoids Microsoft.CSharp dependency
+                var flags  = System.Reflection.BindingFlags.InvokeMethod;
+                var setProp = System.Reflection.BindingFlags.SetProperty;
                 Type   shellT = Type.GetTypeFromProgID("WScript.Shell");
-                dynamic shell = Activator.CreateInstance(shellT);
-                dynamic link  = shell.CreateShortcut(lnk);
-                link.TargetPath       = FindDotnet() ?? "dotnet";
-                link.Arguments        = $"\"{dll}\"";
-                link.WorkingDirectory = Path.GetDirectoryName(dll);
-                link.Description      = "KSP-Connected multiplayer server";
-                link.Save();
+                object shell  = Activator.CreateInstance(shellT);
+                object link   = shellT.InvokeMember("CreateShortcut", flags, null, shell, new object[] { lnk });
+                Type   linkT  = link.GetType();
+                linkT.InvokeMember("TargetPath",       setProp, null, link, new object[] { FindDotnet() ?? "dotnet" });
+                linkT.InvokeMember("Arguments",        setProp, null, link, new object[] { $"\"{dll}\"" });
+                linkT.InvokeMember("WorkingDirectory", setProp, null, link, new object[] { Path.GetDirectoryName(dll) });
+                linkT.InvokeMember("Description",      setProp, null, link, new object[] { "KSP-Connected multiplayer server" });
+                linkT.InvokeMember("Save",             flags,   null, link, null);
 
                 _log("  Shortcut created on Desktop.", false);
             }
