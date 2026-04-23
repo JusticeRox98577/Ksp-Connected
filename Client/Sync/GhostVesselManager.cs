@@ -7,11 +7,6 @@ using UnityEngine;
 
 namespace KspConnected.Client.Sync
 {
-    /// <summary>
-    /// Draws a HUD panel and world-space labels for each remote player.
-    /// Does not spawn real vessels — ProtoVessel spawning crashes KSP when
-    /// the ghost is inside the physics bubble.
-    /// </summary>
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public class GhostVesselManager : MonoBehaviour
     {
@@ -44,42 +39,54 @@ namespace KspConnected.Client.Sync
 
         private void OnGUI()
         {
-            if (_remoteStates.Count == 0) return;
             if (!_stylesInit) InitStyles();
 
             DrawHudPanel();
 
-            Camera cam = MapView.MapIsEnabled
-                ? PlanetariumCamera.Camera
-                : Camera.main;
-            if (cam != null)
-                DrawWorldLabels(cam);
+            if (_remoteStates.Count == 0) return;
+
+            Camera cam = ResolveCamera();
+            if (cam != null) DrawWorldLabels(cam);
         }
 
-        // ── always-visible panel (top-right corner) ──────────────────────────
+        // ── HUD panel — always visible when in flight ─────────────────────────
 
         private void DrawHudPanel()
         {
-            float panelW = 220f;
-            float rowH   = 38f;
-            float panelH = _remoteStates.Count * rowH + 6f;
-            float x      = Screen.width - panelW - 6f;
-            float y      = 40f;
+            var mod  = Core.KspConnectedMod.Instance;
+            bool connected = mod?.Connection.State == Core.ConnectionState.Connected;
+            if (!connected) return;
 
-            GUI.BeginGroup(new Rect(x, y, panelW, panelH));
-            float ry = 3f;
+            const float panelW = 230f;
+            const float rowH   = 36f;
+            float panelH = _remoteStates.Count > 0
+                ? _remoteStates.Count * rowH + 26f
+                : 26f;
+
+            float x = Screen.width - panelW - 8f;
+            float y = 38f;
+
+            GUI.Box(new Rect(x, y, panelW, panelH), "");
+
+            float ry = y + 4f;
+            if (_remoteStates.Count == 0)
+            {
+                GUI.Label(new Rect(x + 6, ry, panelW - 12, 20), "KSP-Connected: no remote players", _hudStyle);
+                return;
+            }
+
             foreach (var state in _remoteStates.Values)
             {
                 double dist = ApproxDistance(state);
                 string distStr = double.IsNaN(dist) ? "?" : FormatDist(dist);
-                string text = $"[{state.PlayerName}]  {distStr}\n{state.VesselName}";
-                GUI.Label(new Rect(4, ry, panelW - 8, rowH - 2), text, _hudStyle);
+                GUI.Label(new Rect(x + 6, ry, panelW - 12, rowH - 2),
+                          $"[{state.PlayerName}]  {distStr}\n{state.VesselName}",
+                          _hudStyle);
                 ry += rowH;
             }
-            GUI.EndGroup();
         }
 
-        // ── world-space labels projected onto the screen ──────────────────────
+        // ── world-space labels ────────────────────────────────────────────────
 
         private void DrawWorldLabels(Camera cam)
         {
@@ -108,24 +115,44 @@ namespace KspConnected.Client.Sync
             }
         }
 
-        // ── helpers ──────────────────────────────────────────────────────────
+        // ── camera resolution ─────────────────────────────────────────────────
+
+        private static Camera ResolveCamera()
+        {
+            if (MapView.MapIsEnabled)
+                return PlanetariumCamera.Camera;
+
+            // KSP stacks multiple cameras; try the tagged main camera first,
+            // then fall back to whatever camera is active.
+            Camera cam = Camera.main;
+            if (cam != null) return cam;
+
+            // Walk all cameras and pick the one with the highest depth
+            // (typically the near-clip flight camera).
+            Camera best = null;
+            foreach (Camera c in Camera.allCameras)
+            {
+                if (best == null || c.depth > best.depth)
+                    best = c;
+            }
+            return best;
+        }
+
+        // ── helpers ───────────────────────────────────────────────────────────
 
         private static double ApproxDistance(VesselState remote)
         {
             Vessel active = FlightGlobals.ActiveVessel;
             if (active == null) return double.NaN;
 
-            double dLat = remote.Latitude  - active.latitude;
-            double dLon = remote.Longitude - active.longitude;
+            double dLat = remote.Latitude    - active.latitude;
+            double dLon = remote.Longitude   - active.longitude;
             double dAlt = remote.AltitudeASL - active.altitude;
             return Math.Sqrt(dLat * dLat + dLon * dLon) * 111_000.0 + Math.Abs(dAlt);
         }
 
         private static string FormatDist(double m)
-        {
-            if (m < 1000) return $"{m:F0} m";
-            return $"{m / 1000:F1} km";
-        }
+            => m < 1000 ? $"{m:F0} m" : $"{m / 1000:F1} km";
 
         private static CelestialBody FindBody(string name)
         {
@@ -136,7 +163,7 @@ namespace KspConnected.Client.Sync
 
         private void InitStyles()
         {
-            _hudStyle = new GUIStyle(GUI.skin.box)
+            _hudStyle = new GUIStyle(GUI.skin.label)
             {
                 fontSize  = 11,
                 alignment = TextAnchor.MiddleLeft,
@@ -146,7 +173,7 @@ namespace KspConnected.Client.Sync
             _labelStyle = new GUIStyle(GUI.skin.label)
             {
                 fontStyle = FontStyle.Bold,
-                fontSize  = 12,
+                fontSize  = 13,
                 alignment = TextAnchor.MiddleCenter,
             };
             _labelStyle.normal.textColor = Color.cyan;

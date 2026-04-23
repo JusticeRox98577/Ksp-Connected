@@ -102,7 +102,9 @@ namespace UnityEngine
 
     public class Camera : Component
     {
-        public static Camera main { get; } = null;
+        public static Camera   main       { get; } = null;
+        public static Camera[] allCameras { get; } = new Camera[0];
+        public float  depth { get; set; }
         public Vector3 WorldToScreenPoint(Vector3 position) => Vector3.zero;
     }
 
