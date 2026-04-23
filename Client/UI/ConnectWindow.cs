@@ -49,8 +49,14 @@ namespace KspConnected.Client.UI
 
         private void OnGUI()
         {
-            if (!_showWindow) return;
             if (!_stylesInit) InitStyles();
+
+            if (!_showWindow)
+            {
+                if (GUI.Button(new Rect(20, 20, 120, 22), "KSP-Connected ▲"))
+                    _showWindow = true;
+                return;
+            }
 
             _windowRect = GUILayout.Window(
                 GUIUtility.GetControlID(FocusType.Passive),
@@ -125,8 +131,8 @@ namespace KspConnected.Client.UI
             }
 
             GUILayout.Space(6);
-            if (GUILayout.Button(_showWindow ? "Hide" : "Show"))
-                _showWindow = !_showWindow;
+            if (GUILayout.Button("Hide"))
+                _showWindow = false;
 
             GUI.DragWindow();
         }
