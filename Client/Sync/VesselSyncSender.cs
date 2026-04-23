@@ -15,12 +15,14 @@ namespace KspConnected.Client.Sync
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public class VesselSyncSender : MonoBehaviour
     {
-        private const float HeartbeatInterval = 2f;   // seconds — send even if no change
+        private const float HeartbeatInterval   = 2f;    // seconds — send even if no change
+        private const float ConfigResendInterval = 10f;  // re-send config so late joiners get it
         private const double PositionDeltaThreshold = 100.0;   // metres
         private const double VelocityDeltaThreshold = 1.0;     // m/s
 
         private VesselState _lastSent;
         private float       _heartbeatTimer;
+        private float       _configResendTimer;
         private Guid        _lastSentVesselId;   // track vessel identity for config resends
 
         private void Update()
@@ -28,17 +30,20 @@ namespace KspConnected.Client.Sync
             var mod = KspConnectedMod.Instance;
             if (mod == null || mod.Connection.State != ConnectionState.Connected) return;
 
-            _heartbeatTimer += UnityEngine.Time.deltaTime;
-            bool forceHeartbeat = _heartbeatTimer >= HeartbeatInterval;
+            _heartbeatTimer      += UnityEngine.Time.deltaTime;
+            _configResendTimer   += UnityEngine.Time.deltaTime;
+            bool forceHeartbeat   = _heartbeatTimer    >= HeartbeatInterval;
+            bool resendConfig     = _configResendTimer >= ConfigResendInterval;
 
             Vessel active = FlightGlobals.ActiveVessel;
             if (active == null) return;
 
-            // Send vessel config whenever we switch to a different vessel
-            if (active.id != _lastSentVesselId)
+            // Send vessel config on vessel change or periodic resend (for late joiners)
+            if (active.id != _lastSentVesselId || resendConfig)
             {
                 SendVesselConfig(active, mod);
-                _lastSentVesselId = active.id;
+                _lastSentVesselId  = active.id;
+                if (resendConfig) _configResendTimer = 0f;
             }
 
             VesselState state = SnapshotVessel(active, mod.Connection.LocalPlayerId, mod.PlayerName);

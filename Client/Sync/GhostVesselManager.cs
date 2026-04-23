@@ -38,6 +38,8 @@ namespace KspConnected.Client.Sync
         private void Awake()
         {
             Instance = this;
+            // Process any VesselConfig messages that arrived before this scene loaded
+            Core.KspConnectedMod.Instance?.DrainPendingConfigs(this);
         }
 
         private void OnDestroy()

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using KspConnected.Client.Sync;
 using KspConnected.Client.Time;
 using KspConnected.Client.UI;
@@ -23,6 +24,19 @@ namespace KspConnected.Client.Core
         public PlayerListTracker   Players       { get; private set; }
 
         public string PlayerName { get; set; } = "Jebediah";
+
+        // Cache the latest VesselConfig per player so GhostVesselManager can
+        // drain it when it initialises (handles the race where config arrives
+        // before the Flight scene addons are ready).
+        private readonly Dictionary<int, VesselConfigMessage> _pendingConfigs =
+            new Dictionary<int, VesselConfigMessage>();
+
+        public void DrainPendingConfigs(GhostVesselManager target)
+        {
+            foreach (var msg in _pendingConfigs.Values)
+                target.OnVesselConfig(msg);
+            _pendingConfigs.Clear();
+        }
 
         private void Awake()
         {
@@ -80,7 +94,8 @@ namespace KspConnected.Client.Core
         private void OnPlayerList(PlayerListMessage msg)  => Players.Update(msg);
         private void OnVesselConfig(VesselConfigMessage msg)
         {
-            // Delegate spawning to GhostVesselManager (only exists in Flight scene)
+            // Cache so GhostVesselManager can drain it when it starts up
+            _pendingConfigs[msg.PlayerId] = msg;
             Sync.GhostVesselManager.Instance?.OnVesselConfig(msg);
         }
 
@@ -95,6 +110,7 @@ namespace KspConnected.Client.Core
         {
             VesselStore.Clear();
             Players.Clear();
+            _pendingConfigs.Clear();
             Sync.GhostVesselManager.Instance?.RemoveAll();
             KspLog.Log("Disconnected: " + reason);
         }
