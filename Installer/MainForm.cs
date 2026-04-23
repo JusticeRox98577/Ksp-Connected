@@ -181,7 +181,7 @@ namespace KspConnectedInstaller
             // Version label
             var versionLabel = new Label
             {
-                Text      = "v1.0.0",
+                Text      = "v1.0.0-alpha",
                 Location  = new Point(16, 505),
                 AutoSize  = true,
                 ForeColor = Color.FromArgb(80, 80, 100),

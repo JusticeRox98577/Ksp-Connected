@@ -147,7 +147,15 @@ jobs:
 
       - name: Get version from tag
         id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "version=$TAG" >> $GITHUB_OUTPUT
+          # Mark as pre-release if tag contains alpha, beta, or rc
+          if echo "$TAG" | grep -qiE 'alpha|beta|rc'; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -178,7 +186,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: KSP-Connected v${{ steps.version.outputs.version }}
+          name: KSP-Connected v${{ steps.version.outputs.version }}${{ steps.version.outputs.prerelease == 'true' && ' — Pre-release' || '' }}
           body: |
             ## KSP-Connected v${{ steps.version.outputs.version }}
 
@@ -211,4 +219,4 @@ jobs:
           files: |
             dist/*.zip
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.version.outputs.prerelease }}
