@@ -70,11 +70,11 @@ namespace KspConnected.Client.Sync
                     ConfigData = compressed,
                 };
                 mod.Connection.SendVesselConfig(msg);
-                Logger.Log($"VesselConfig sent ({compressed.Length} bytes compressed).");
+                KspLog.Log($"VesselConfig sent ({compressed.Length} bytes compressed).");
             }
             catch (Exception ex)
             {
-                Logger.Error("SendVesselConfig: " + ex.Message);
+                KspLog.Error("SendVesselConfig: " + ex.Message);
             }
         }
 
@@ -122,8 +122,8 @@ namespace KspConnected.Client.Sync
                     UniversalTime = Planetarium.GetUniversalTime(),
                 };
 
-                // Velocity in world space
-                Vector3d vel = v.GetWorldVelocity();
+                // Velocity in world space (orbital frame)
+                Vector3d vel = v.obt_velocity;
                 state.VelX = vel.x;
                 state.VelY = vel.y;
                 state.VelZ = vel.z;
@@ -151,7 +151,7 @@ namespace KspConnected.Client.Sync
             }
             catch (Exception ex)
             {
-                Logger.Error("SnapshotVessel: " + ex.Message);
+                KspLog.Error("SnapshotVessel: " + ex.Message);
                 return null;
             }
         }

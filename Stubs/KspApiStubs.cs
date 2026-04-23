@@ -117,11 +117,11 @@ public class Vessel : UnityEngine.Object
     public DiscoveryInfo    DiscoveryInfo  { get; }      = new DiscoveryInfo();
     public Transform        transform      { get; }      = new Transform();
 
+    public Vector3d     obt_velocity      { get; set; }
     public ProtoVessel  BackupVessel()    => new ProtoVessel();
     public void         Die()             { }
     public void         SetPosition(Vector3d pos) { }
     public void         SetWorldVelocity(Vector3d vel) { }
-    public Vector3d     GetWorldVelocity() => new Vector3d();
     public Vector3d     GetWorldPos3D()    => new Vector3d();
 }
 

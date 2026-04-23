@@ -48,11 +48,11 @@ namespace KspConnected.Client.Core
         {
             if (State != ConnectionState.Disconnected)
             {
-                Logger.Warn("Already connecting/connected.");
+                KspLog.Warn("Already connecting/connected.");
                 return;
             }
             State = ConnectionState.Connecting;
-            Logger.Log($"Connecting to {host}:{port} as '{playerName}'…");
+            KspLog.Log($"Connecting to {host}:{port} as '{playerName}'…");
 
             _tcp = new TcpClient { NoDelay = true };
             _tcp.BeginConnect(host, port, ar =>
@@ -62,7 +62,7 @@ namespace KspConnected.Client.Core
                     _tcp.EndConnect(ar);
                     _stream = _tcp.GetStream();
                     State = ConnectionState.Connected;
-                    Logger.Log("TCP connected. Sending Hello.");
+                    KspLog.Log("TCP connected. Sending Hello.");
 
                     SendPayload(MessageType.Hello, new HelloMessage
                     {
@@ -77,7 +77,7 @@ namespace KspConnected.Client.Core
                 catch (Exception ex)
                 {
                     State = ConnectionState.Disconnected;
-                    Logger.Error("Connect failed: " + ex.Message);
+                    KspLog.Error("Connect failed: " + ex.Message);
                     ThreadDispatcher.Instance?.Enqueue(
                         () => OnDisconnected?.Invoke("Connect failed: " + ex.Message));
                 }
@@ -120,7 +120,7 @@ namespace KspConnected.Client.Core
             }
             catch (Exception ex)
             {
-                Logger.Error("Send error: " + ex.Message);
+                KspLog.Error("Send error: " + ex.Message);
                 CloseSocket("Send error: " + ex.Message);
             }
         }
@@ -137,7 +137,7 @@ namespace KspConnected.Client.Core
             }
             catch (Exception ex) when (State == ConnectionState.Connected)
             {
-                Logger.Error("Read error: " + ex.Message);
+                KspLog.Error("Read error: " + ex.Message);
                 CloseSocket("Connection lost: " + ex.Message);
             }
         }
@@ -192,7 +192,7 @@ namespace KspConnected.Client.Core
                     break; // heartbeat reply — nothing to do
 
                 default:
-                    Logger.Warn($"Unknown message type: 0x{(byte)type:X2}");
+                    KspLog.Warn($"Unknown message type: 0x{(byte)type:X2}");
                     break;
             }
         }
@@ -206,7 +206,7 @@ namespace KspConnected.Client.Core
             try { _tcp?.Close(); }    catch { }
             _stream = null;
             _tcp    = null;
-            Logger.Log("Disconnected: " + reason);
+            KspLog.Log("Disconnected: " + reason);
             ThreadDispatcher.Instance?.Enqueue(() => OnDisconnected?.Invoke(reason));
         }
     }

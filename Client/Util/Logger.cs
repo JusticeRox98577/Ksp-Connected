@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace KspConnected.Client.Util
 {
-    public static class Logger
+    public static class KspLog
     {
         private const string Tag = "[KspConnected] ";
 

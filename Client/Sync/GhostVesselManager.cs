@@ -75,7 +75,7 @@ namespace KspConnected.Client.Sync
             if (_ghostVessels.TryGetValue(playerId, out Vessel vessel) && vessel != null)
             {
                 try { vessel.Die(); }
-                catch (Exception ex) { Logger.Warn("GhostVesselManager.RemoveGhost: " + ex.Message); }
+                catch (Exception ex) { KspLog.Warn("GhostVesselManager.RemoveGhost: " + ex.Message); }
             }
             _ghostVessels.Remove(playerId);
             _loadedConfigs.Remove(playerId);
@@ -97,7 +97,7 @@ namespace KspConnected.Client.Sync
                 ConfigNode node   = ConfigNode.Parse(configText);
                 if (node == null)
                 {
-                    Logger.Warn($"GhostVesselManager: failed to parse ConfigNode for player {msg.PlayerId}");
+                    KspLog.Warn($"GhostVesselManager: failed to parse ConfigNode for player {msg.PlayerId}");
                     return;
                 }
 
@@ -115,7 +115,7 @@ namespace KspConnected.Client.Sync
                 Vessel spawned = FindVesselByProto(proto);
                 if (spawned == null)
                 {
-                    Logger.Warn($"GhostVesselManager: ProtoVessel loaded but Vessel not found for player {msg.PlayerId}");
+                    KspLog.Warn($"GhostVesselManager: ProtoVessel loaded but Vessel not found for player {msg.PlayerId}");
                     return;
                 }
 
@@ -126,11 +126,11 @@ namespace KspConnected.Client.Sync
                 _ghostVessels[msg.PlayerId]  = spawned;
                 _loadedConfigs[msg.PlayerId] = msg.VesselId;
 
-                Logger.Log($"Ghost vessel spawned for player #{msg.PlayerId}: {spawned.vesselName}");
+                KspLog.Log($"Ghost vessel spawned for player #{msg.PlayerId}: {spawned.vesselName}");
             }
             catch (Exception ex)
             {
-                Logger.Error($"GhostVesselManager.SpawnGhostVessel (player {msg.PlayerId}): {ex}");
+                KspLog.Error($"GhostVesselManager.SpawnGhostVessel (player {msg.PlayerId}): {ex}");
             }
         }
 
@@ -210,7 +210,7 @@ namespace KspConnected.Client.Sync
             }
             catch (Exception ex)
             {
-                Logger.Error($"UpdateGhostPosition (player {state.PlayerId}): {ex.Message}");
+                KspLog.Error($"UpdateGhostPosition (player {state.PlayerId}): {ex.Message}");
             }
         }
 

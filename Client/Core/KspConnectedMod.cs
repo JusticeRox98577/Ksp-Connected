@@ -37,7 +37,7 @@ namespace KspConnected.Client.Core
             Players     = new PlayerListTracker();
 
             WireEvents();
-            Logger.Log("KSP-Connected initialised.");
+            KspLog.Log("KSP-Connected initialised.");
         }
 
         private void WireEvents()
@@ -70,11 +70,11 @@ namespace KspConnected.Client.Core
         {
             if (!msg.Accepted)
             {
-                Logger.Warn("Server rejected connection: " + msg.RejectReason);
+                KspLog.Warn("Server rejected connection: " + msg.RejectReason);
                 Connection.Disconnect(msg.RejectReason);
                 return;
             }
-            Logger.Log($"Connected to '{msg.ServerName}' as player #{msg.AssignedPlayerId}");
+            KspLog.Log($"Connected to '{msg.ServerName}' as player #{msg.AssignedPlayerId}");
         }
 
         private void OnPlayerList(PlayerListMessage msg)  => Players.Update(msg);
@@ -96,7 +96,7 @@ namespace KspConnected.Client.Core
             VesselStore.Clear();
             Players.Clear();
             Sync.GhostVesselManager.Instance?.RemoveAll();
-            Logger.Log("Disconnected: " + reason);
+            KspLog.Log("Disconnected: " + reason);
         }
 
         // --- public API for UI ---

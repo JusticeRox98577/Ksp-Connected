@@ -41,7 +41,7 @@ namespace KspConnected.Client.Util
                     action = _queue.Dequeue();
                 }
                 try { action(); }
-                catch (Exception ex) { Logger.Error("ThreadDispatcher action threw: " + ex); }
+                catch (Exception ex) { KspLog.Error("ThreadDispatcher action threw: " + ex); }
             }
         }
     }
