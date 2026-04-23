@@ -1,0 +1,160 @@
+name: Create Alpha Release
+
+# Run this manually from GitHub → Actions → "Create Alpha Release" → Run workflow
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "yes" to publish v1.0.0-alpha'
+        required: true
+        default: 'no'
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Build installer exe ──────────────────────────────────────────────────
+  build-installer:
+    name: Build Windows Installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/ksp-multiplayer-mod-hyfzh
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Build installer exe
+        run: |
+          dotnet build Installer/KspConnectedInstaller.csproj -c Release -nologo
+          copy Installer\bin\Release\net48\KspConnected-Installer.exe KspConnected-Installer.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: KspConnected-Installer.exe
+
+  # ── Build server for all platforms ──────────────────────────────────────
+  build-server:
+    name: Build Server (${{ matrix.rid }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rid: [linux-x64, win-x64, osx-x64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/ksp-multiplayer-mod-hyfzh
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Publish server
+        run: |
+          dotnet publish Server/KspConnected.Server.csproj \
+            -c Release -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:DebugType=none \
+            -o dist/server-${{ matrix.rid }}
+          cp server.json dist/server-${{ matrix.rid }}/
+
+      - name: Zip server
+        run: |
+          cd dist
+          zip -r KSP-Connected-Server-${{ matrix.rid }}.zip server-${{ matrix.rid }}/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.rid }}
+          path: dist/KSP-Connected-Server-${{ matrix.rid }}.zip
+
+  # ── Create the GitHub Release ────────────────────────────────────────────
+  release:
+    name: Publish v1.0.0-alpha Release
+    needs: [build-installer, build-server]
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'yes'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/ksp-multiplayer-mod-hyfzh
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Organise release files
+        run: |
+          mkdir -p dist
+          cp artifacts/installer/KspConnected-Installer.exe       dist/
+          cp artifacts/server-linux-x64/*.zip                     dist/
+          cp artifacts/server-win-x64/*.zip                       dist/
+          cp artifacts/server-osx-x64/*.zip                       dist/
+          ls -lh dist/
+
+      - name: Create tag and release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0-alpha
+          name: "KSP-Connected v1.0.0-alpha — Pre-release"
+          prerelease: true
+          target_commitish: claude/ksp-multiplayer-mod-hyfzh
+          body: |
+            ## KSP-Connected v1.0.0-alpha
+
+            > ⚠️ This is an **alpha pre-release**. Expect bugs. Please report issues!
+
+            Cross-PC multiplayer mod for **Kerbal Space Program 1.12**.
+
+            ---
+
+            ### 🖥️ Windows — One-click installer (recommended)
+            1. Download **`KspConnected-Installer.exe`** below
+            2. Run it — it will auto-detect your KSP folder
+            3. Click **Install Now** and you're done
+
+            > Requires: .NET 6 SDK ([download](https://dotnet.microsoft.com/download/dotnet/6.0)) for the build step.
+            > The installer will tell you if it's missing.
+
+            ---
+
+            ### 🐧 Linux / macOS — Script installer
+            ```bash
+            git clone https://github.com/JusticeRox98577/Ksp-Connected
+            cd Ksp-Connected
+            git checkout claude/ksp-multiplayer-mod-hyfzh
+            chmod +x scripts/install.sh && ./scripts/install.sh
+            ```
+
+            ---
+
+            ### 🖧 Hosting a server
+            Download the server zip for your OS and run:
+            ```
+            # Windows
+            KspConnected.Server.exe
+
+            # Linux / macOS  
+            ./KspConnected.Server
+            ```
+            Forward **TCP port 7654** on your router. Share your public IP with friends.
+
+            ---
+
+            ### What's included
+            - Real-time vessel sync (Keplerian orbital elements)
+            - **Full ghost vessel spawning** — other players' ships appear as real KSP objects with collision
+            - Map view markers for remote players
+            - In-flight HUD (player list, body, altitude)
+            - In-game chat
+            - NTP-style universal time synchronisation
+          files: |
+            dist/KspConnected-Installer.exe
+            dist/KSP-Connected-Server-linux-x64.zip
+            dist/KSP-Connected-Server-win-x64.zip
+            dist/KSP-Connected-Server-osx-x64.zip
