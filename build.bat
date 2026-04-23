@@ -53,7 +53,16 @@ IF NOT EXIST "%KSP_PATH%" (
     EXIT /B 1
 )
 dotnet build Client\KspConnected.Client.csproj -c Release -p:KspPath="%KSP_PATH%"
-EXIT /B %ERRORLEVEL%
+IF ERRORLEVEL 1 EXIT /B %ERRORLEVEL%
+
+echo.
+echo ^>^>^> Copying plugin DLLs to KSP GameData...
+set "PLUGIN_DIR=%KSP_PATH%\GameData\KspConnected\Plugins"
+IF NOT EXIST "%PLUGIN_DIR%" mkdir "%PLUGIN_DIR%"
+copy /Y "Client\bin\Release\net472\KspConnected.Client.dll"  "%PLUGIN_DIR%\" >nul
+copy /Y "Client\bin\Release\net472\KspConnected.Shared.dll"  "%PLUGIN_DIR%\" >nul
+echo     Copied to: %PLUGIN_DIR%
+EXIT /B 0
 
 :done
 echo.
@@ -63,5 +72,5 @@ echo ============================================
 echo.
 echo Next steps:
 echo   Server: dotnet Server\bin\Release\net6.0\KspConnected.Server.dll
-echo   Client: Copy GameData\KspConnected\ into your KSP GameData\ folder
+echo   Client DLLs copied automatically to %KSP_PATH%\GameData\KspConnected\Plugins\
 endlocal
