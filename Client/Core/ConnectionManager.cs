@@ -54,12 +54,12 @@ namespace KspConnected.Client.Core
             State = ConnectionState.Connecting;
             KspLog.Log($"Connecting to {host}:{port} as '{playerName}'…");
 
-            _tcp = new TcpClient { NoDelay = true };
-            _tcp.BeginConnect(host, port, ar =>
+            var thread = new Thread(() =>
             {
                 try
                 {
-                    _tcp.EndConnect(ar);
+                    _tcp = new TcpClient { NoDelay = true };
+                    _tcp.Connect(host, port);
                     _stream = _tcp.GetStream();
                     State = ConnectionState.Connected;
                     KspLog.Log("TCP connected. Sending Hello.");
@@ -81,7 +81,9 @@ namespace KspConnected.Client.Core
                     ThreadDispatcher.Instance?.Enqueue(
                         () => OnDisconnected?.Invoke("Connect failed: " + ex.Message));
                 }
-            }, null);
+            })
+            { IsBackground = true, Name = "KspConnected-Connect" };
+            thread.Start();
         }
 
         public void Disconnect(string reason = "User disconnected")
