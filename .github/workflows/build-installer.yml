@@ -1,13 +1,15 @@
-name: Build Installer
+name: Release v1.0.1-alpha
 
 on:
-  workflow_dispatch:  # trigger manually from GitHub Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build:
-    name: Build Windows Installer
+  build-installer:
+    name: Windows Installer
     runs-on: windows-latest
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,9 +24,122 @@ jobs:
           dotnet build Installer/KspConnectedInstaller.csproj -c Release -nologo
           copy Installer\bin\Release\net48\KspConnected-Installer.exe KspConnected-Installer.exe
 
-      - name: Upload installer
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: KspConnected-Installer-v1.0.1-alpha
+          name: installer
           path: KspConnected-Installer.exe
-          retention-days: 30
+
+  build-server:
+    name: Server (${{ matrix.rid }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rid: [linux-x64, win-x64, osx-x64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/ksp-multiplayer-mod-hyfzh
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Publish server
+        run: |
+          dotnet publish Server/KspConnected.Server.csproj \
+            -c Release -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:DebugType=none \
+            -o dist/server-${{ matrix.rid }}
+          cp server.json dist/server-${{ matrix.rid }}/
+
+      - name: Zip server
+        run: |
+          cd dist
+          zip -r KSP-Connected-Server-${{ matrix.rid }}.zip server-${{ matrix.rid }}/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.rid }}
+          path: dist/KSP-Connected-Server-${{ matrix.rid }}.zip
+
+  release:
+    name: Publish Release
+    needs: [build-installer, build-server]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/ksp-multiplayer-mod-hyfzh
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Organise files
+        run: |
+          mkdir -p dist
+          cp artifacts/installer/KspConnected-Installer.exe  dist/
+          cp artifacts/server-linux-x64/*.zip                dist/
+          cp artifacts/server-win-x64/*.zip                  dist/
+          cp artifacts/server-osx-x64/*.zip                  dist/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.1-alpha
+          name: "KSP-Connected v1.0.1-alpha — Pre-release"
+          prerelease: true
+          target_commitish: claude/ksp-multiplayer-mod-hyfzh
+          body: |
+            ## KSP-Connected v1.0.1-alpha
+
+            > ⚠️ Alpha pre-release — expect bugs. Please report issues!
+
+            Cross-PC multiplayer mod for **Kerbal Space Program 1.12**.
+
+            ---
+
+            ### What's new in v1.0.1
+            - **Relay mode** — play without port forwarding. Host creates a room and shares a 6-character code; friends join using the new Relay tab. Deploy the relay server free on Railway / Render / Fly.io (Dockerfile included).
+            - **Improved KSP auto-detection** — installer now scans every drive letter (C: through Z:) and checks GOG, Epic Games, and custom paths like `D:\KSP\`, not just the default Steam location.
+            - **Fixed duplicate log message** — "KSP not found" no longer appears twice on startup.
+
+            ---
+
+            ### 🖥️ Windows — One-click installer (recommended)
+            1. Download **`KspConnected-Installer.exe`** below
+            2. Run it — auto-detects KSP on any drive (Steam, GOG, Epic, custom folder)
+            3. Click **Install Now**
+
+            > Requires .NET 6 SDK ([download](https://dotnet.microsoft.com/download/dotnet/6.0)) — the installer will tell you if it's missing.
+
+            ---
+
+            ### 🖧 Playing without port forwarding (new in v1.0.1)
+            Deploy the relay server free on Railway/Render/Fly.io (uses the included Dockerfile),
+            then use the **Relay** tab in the KSP-Connected window — share a 6-character room code with friends. No router config needed.
+
+            ---
+
+            ### 🖧 Hosting a direct server
+            Download the server zip for your OS and run:
+            ```
+            KspConnected.Server.exe          # Windows
+            ./KspConnected.Server            # Linux / macOS
+            ```
+            Forward **TCP port 7654** and share your public IP.
+
+            ---
+
+            ### What's included
+            - Real-time vessel sync (Keplerian orbital elements)
+            - Full ghost vessel spawning — other players' ships appear as real KSP objects with collision
+            - Map view markers for remote players
+            - In-flight HUD, in-game chat, NTP-style time sync
+            - **Relay mode** — play without port forwarding via room codes
+          files: |
+            dist/KspConnected-Installer.exe
+            dist/KSP-Connected-Server-linux-x64.zip
+            dist/KSP-Connected-Server-win-x64.zip
+            dist/KSP-Connected-Server-osx-x64.zip
