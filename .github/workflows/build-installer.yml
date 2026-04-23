@@ -1,0 +1,30 @@
+name: Build Installer
+
+on:
+  workflow_dispatch:  # trigger manually from GitHub Actions tab
+
+jobs:
+  build:
+    name: Build Windows Installer
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/ksp-multiplayer-mod-hyfzh
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Build installer exe
+        run: |
+          dotnet build Installer/KspConnectedInstaller.csproj -c Release -nologo
+          copy Installer\bin\Release\net48\KspConnected-Installer.exe KspConnected-Installer.exe
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: KspConnected-Installer-v1.0.1-alpha
+          path: KspConnected-Installer.exe
+          retention-days: 30
