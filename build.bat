@@ -8,7 +8,7 @@ REM ============================================================
 
 setlocal
 
-IF "%KSP_PATH%"=="" SET KSP_PATH=C:\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program
+IF "%KSP_PATH%"=="" SET KSP_PATH=D:\KSP\Kerbal Space Program
 SET TARGET=%1
 IF "%TARGET%"=="" SET TARGET=all
 
