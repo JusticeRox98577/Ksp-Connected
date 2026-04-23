@@ -58,11 +58,19 @@ namespace KspConnected.Client.Core
             {
                 try
                 {
+                    KspLog.Log($"[Connect] Creating TcpClient for {host}:{port}");
                     _tcp = new TcpClient { NoDelay = true };
-                    _tcp.Connect(host, port);
+
+                    // 5-second connect timeout
+                    var connectTask = _tcp.ConnectAsync(host, port);
+                    if (!connectTask.Wait(TimeSpan.FromSeconds(5)))
+                        throw new TimeoutException($"Timed out connecting to {host}:{port}");
+                    if (connectTask.IsFaulted)
+                        throw connectTask.Exception?.InnerException ?? connectTask.Exception;
+
+                    KspLog.Log("[Connect] TCP connected. Sending Hello.");
                     _stream = _tcp.GetStream();
-                    State = ConnectionState.Connected;
-                    KspLog.Log("TCP connected. Sending Hello.");
+                    State   = ConnectionState.Connected;
 
                     SendPayload(MessageType.Hello, new HelloMessage
                     {
@@ -71,13 +79,14 @@ namespace KspConnected.Client.Core
                         RoomCode    = roomCode ?? "",
                     }.ToPayload());
 
+                    KspLog.Log("[Connect] Hello sent. Starting read loop.");
                     _readThread = new Thread(ReadLoop) { IsBackground = true, Name = "KspConnected-Recv" };
                     _readThread.Start();
                 }
                 catch (Exception ex)
                 {
                     State = ConnectionState.Disconnected;
-                    KspLog.Error("Connect failed: " + ex.Message);
+                    KspLog.Error("[Connect] FAILED: " + ex.Message);
                     ThreadDispatcher.Instance?.Enqueue(
                         () => OnDisconnected?.Invoke("Connect failed: " + ex.Message));
                 }
