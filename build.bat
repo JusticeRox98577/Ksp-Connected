@@ -47,11 +47,10 @@ EXIT /B %ERRORLEVEL%
 echo.
 echo ^>^>^> Building Client plugin...
 echo     KSP_PATH = %KSP_PATH%
-IF NOT EXIST "%KSP_PATH%" (
-    echo ERROR: KSP not found at: %KSP_PATH%
-    echo Set the KSP_PATH environment variable.
-    EXIT /B 1
-)
+IF EXIST "%KSP_PATH%\" GOTO ksp_found
+echo ERROR: KSP not found. Set the KSP_PATH environment variable.
+EXIT /B 1
+:ksp_found
 dotnet build Client\KspConnected.Client.csproj -c Release -p:KspPath="%KSP_PATH%"
 IF ERRORLEVEL 1 EXIT /B %ERRORLEVEL%
 
@@ -59,8 +58,8 @@ echo.
 echo ^>^>^> Copying plugin DLLs to KSP GameData...
 set "PLUGIN_DIR=%KSP_PATH%\GameData\KspConnected\Plugins"
 IF NOT EXIST "%PLUGIN_DIR%" mkdir "%PLUGIN_DIR%"
-copy /Y "Client\bin\Release\net472\KspConnected.Client.dll"  "%PLUGIN_DIR%\" >nul
-copy /Y "Client\bin\Release\net472\KspConnected.Shared.dll"  "%PLUGIN_DIR%\" >nul
+copy /Y "Client\bin\Release\net472\KspConnected.Client.dll" "%PLUGIN_DIR%\" >nul
+copy /Y "Client\bin\Release\net472\KspConnected.Shared.dll" "%PLUGIN_DIR%\" >nul
 echo     Copied to: %PLUGIN_DIR%
 EXIT /B 0
 
